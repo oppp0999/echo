@@ -1,0 +1,49 @@
+$ tree
+.
+├── account/
+│   ├── model.go
+│   └── service.go
+├── cart/
+│   ├── model.go
+│   └── service.go
+├── catalog/
+│   ├── model.go
+│   └── service.go
+├── cmd
+|   └── server/
+|       ├── config.production.yml
+|       ├── config.staging.yml
+|       ├── config.yml
+|       ├── handler.go
+|       ├── main.go
+|       ├── main_test.go
+|       └── swagger.yml
+└── kit/
+    ├── httpreq/
+    ├── number/
+    ├── scanner/
+    └── transport/
+각 모듈은 라이브러리 형태로 패키지를 만들고, 프로그램 실행을 위핸 패키지는 cmd 안에서 구성한다는 것이다. 이 방식으로 웹 어플리케이션을 작성해 보니, 처음 웹 요청을 받아서 각 모듈로 연결하는 핸들러 로직이 담긴 /cmd/server/handler.go 파일이 꽤 커졌고, handler 또한 모듈별로 분리해야 할 필요가 생겼다. controller 디렉토리와 model 디렉토리를 나누는 전통적인 MVC 프로젝트의 형태와 점점 유사해졌다.
+
+Package Oriented Design에서 소개하는 방식, 그리고 github의 많은 Go 프로젝트에서 사용하고 있는 패키지 구조는 여러 프로젝트에서 사용하는 라이브러리 패키지에 적합하다는 생각이 들었다. 웹 어플리케이션에서는 이러한 구조가 불편하게 느껴졌다. 여러 서비스에서 사용하는 라이브러리 패키지가 아니라면, 이렇게 구성을 하지 않기로 했다. 결국 웹 어플리케이션에서는 controller/model 형태의 익숙한 구성을 채택했다.
+
+$ tree
+.
+├── controllers/
+├── filters/
+├── models/
+├── static/
+│   ├── css/
+│   └── js/
+|── views/
+|   ├── 404.html
+|   ├── 500.html
+|   ├── index.html
+|   └── layout/
+└── main.go
+
+
+negroni + gorilla mux + render
+negroni, gorilla mux 그리고 render의 조합은 내가 가장 선호하던 방식이었다. 그래서 Go 언어 웹 프로그래밍 철저 입문 책에서 다양한 패키지를 조합하여 마이크로 프레임워크 구성하기란 제목으로 소개도 했었다.
+
+처음에 가볍게 웹프레임워크를 구성해서 사용하기는 좋았었는데, 하다보니 매번 똑같은 작업을 반복하고 있더라. JWT 인증 처리 미들웨어를 넣고, 세션/쿠키 사용을 위한 구성을 해 주고, 렌더러를 세팅하는 작업을 매번 해야 했다. 어차피 이렇게 다양한 패키지를 조합해서 써야 한다면, 그리고 그 방식이 매번 똑같다면, 굳이 이렇게 쓸 필요가 있을까? 적어도 이런 기본적인 것들은 내장된 프레임워크를 쓰는 것이 낫지 않을까? 점점 negroni 기반으로 프레임워크를 직접 구성하는 방식에 회의가 들기 시작했다. 이런 경험을 통해 echo로 넘어가서 그런지, echo와 같은 스타일이 참 마음에 들었다.

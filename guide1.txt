@@ -1,0 +1,428 @@
+Installation
+사전 준비사항
+> GO 설치
+
+> GOPATH 설정
+
+ 
+
+go get을 이용하여 설치
+$ cd $GOPATH
+
+$ go get -u github.com/labstack/echo
+ 
+
+Customization
+Debug
+Debug : 디버깅 모드는 log level을 DEBUG로 세팅하면 사용 가능
+
+ 
+
+Logging
+Logging : 로깅하는 default은 json이고, 해더를 수정함으로 변경할 수 있다.
+
+Log Header : Logger.SetHeader(io.Writer)를 사용하여 로그 타입을 설정 할 수 있다.
+
+ 
+
+Default 로깅
+{"time":"${time_rfc3339_nano}","level":"${level}","prefix":"${prefix}","file":"${short_file}","line":"${line}"}
+ 
+
+Example
+import "github.com/labstack/gommon/log"
+
+/* ... */
+
+if l, ok := e.Logger.(*log.Logger); ok {
+  l.SetHeader("${time_rfc3339} ${level}")
+}
+ 
+
+Output
+
+ 
+
+사용 가능한 태그
+
+ 
+
+Log Output
+Logger.SetOutput(io.Writer)를 사용하여 로그의 최종 출력을 세팅할 수 있다. 기본 값은 os.Stdout
+
+완전하게 로그 사용을 중단 하기 위해서는 Logger.SetOutput(ioutil.Discard) 또는 Logger.SetLevel(log.OFF)를 사용한다.
+
+ 
+
+Log Level
+Logger.SetLevel(log.Lvl) 를 사용하여 로그의 레벨을 선택 할 수 있다. 기본 값은 ERROR이다.
+
+아래와 같은 옵션이 사용 가능하다.
+
+> DEBUG, INFO, WARN, ERROR, OFF
+
+ 
+
+Context
+echo.Context는 현재 HTTP요청의 컨텍스트를 나타낸다. 요청 및 응답 참조, 경로, 경로 매개 변수, 데이터, 등록 된 핸들러 및 요청을 읽고 응답을 작성하는 API를 보유합니다. Context는 인터페이스로써, 사용자 정의 API로 쉽게 확장할 수 있다.
+
+ 
+
+사용자 정의 컨텍스트 정의
+type CustomContext struct {
+	echo.Context
+}
+
+func (c *CustomContext) Foo() {
+	println("foo")
+}
+
+func (c *CustomContext) Bar() {
+	println("bar")
+}
+ 
+
+디폴트 컨텍스로 확장하기 위한 미들웨어 생성
+// 이 미들웨어는 다른 미들웨어 보다 먼저 등록해야한다
+
+e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		cc := &CustomContext{c}
+		return next(cc)
+	}
+})
+ 
+
+핸들러에서 사용
+e.GET("/", func(c echo.Context) error {
+	cc := c.(*CustomContext)
+	cc.Foo()
+	cc.Bar()
+	return cc.String(200, "OK")
+})
+ 
+
+Cookies
+쿠키는 웹 사이트 서버에서 전송 된 작은 데이터 조각으로, 탐색하는 동안 사용자의 웹 브라우저에 저장됩니다. 사용자가 웹 사이트를로드 할 때마다 브라우저는 쿠키를 서버로 다시 보내 서버에 사용자의 최신 활동을 알립니다. 쿠키는 웹 사이트가 상태 저장 정보 (예 : 온라인 상점의 장바구니에 추가 된 항목)를 기억하거나 사용자의 탐색 활동 (예 : 특정 단추 클릭, 로그인 또는 이전에 방문한 페이지 클릭)을 기록 할 수있는 신뢰할 수있는 메커니즘으로 설계되었습니다. 웹 사이트). 쿠키는 사용자 이름, 성별, 나이, 주소 등과 같이 사용자가 이전에 입력 한 양식 컨텐츠를 저장할 수도 있습니다.
+
+ 
+
+쿠키의 속성값들
+
+Echo는 go 표준 http.Cookie객체를 사용 하여 처리기 함수에서 수신 한 컨텍스트에서 쿠키를 추가 / 검색합니다.
+ 
+
+쿠키 생성하기
+func writeCookie(c echo.Context) error {
+	cookie := new(http.Cookie)
+	cookie.Name = "username"
+	cookie.Value = "jon"
+	cookie.Expires = time.Now().Add(24 * time.Hour)
+	c.SetCookie(cookie)
+	return c.String(http.StatusOK, "write a cookie")
+}
+ 
+
+쿠키는 new(http.Cookie) 를 사용하여 생성됩니다
+쿠키의 속성 은 http.Cookie(인스턴스 퍼블릭 속성)에 할당되도록 설정 됩니다.
+마지막으로 HTTP 응답의 Set-Cookie 헤더에 c.SetCookie(cookie)를 추가한다
+ 
+
+쿠키 읽기
+func readCookie(c echo.Context) error {
+	cookie, err := c.Cookie("username")
+	if err != nil {
+		return err
+	}
+	fmt.Println(cookie.Name)
+	fmt.Println(cookie.Value)
+	return c.String(http.StatusOK, "read a cookie")
+}
+ 
+
+쿠키는 c.Cookie("username") HTTP 요청을 사용하여 이름으로 읽는다
+쿠키 속성은 Getter기능을 사용하여 액세스 합니다.
+ 
+
+모든 쿠키 읽기
+func readAllCookies(c echo.Context) error {
+	for _, cookie := range c.Cookies() {
+		fmt.Println(cookie.Name)
+		fmt.Println(cookie.Value)
+	}
+	return c.String(http.StatusOK, "read all the cookies")
+}
+ 
+
+ERROR Handling
+Echo는 미들웨어 및 핸들러에서 오류를 리턴하여 중앙 집중식 HTTP 오류 처리를 옹호합니다. 중앙 집중식 오류 처리기를 사용하면 통합 된 위치에서 외부 서비스에 오류를 기록하고 사용자 지정된 HTTP 응답을 클라이언트에 보낼 수 있습니다.
+
+표준 error 또는 echo.*HTTPError 을 반환 할 수 있습니다
+
+예를 들어, 기본 인증 미들웨어가 잘못된 자격 증명을 발견하면 401-Unauthorized 오류를 반환하여 현재 HTTP 요청을 중단합니다.
+
+ 
+
+Example
+e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+  return func(c echo.Context) error {
+    // Extract the credentials from HTTP request header and perform a security
+    // check
+
+    // For invalid credentials
+    return echo.NewHTTPError(http.StatusUnauthorized, "Please provide valid credentials")
+
+    // For valid credentials call next
+    // return next(c)
+  }
+})
+ 
+
+>> 메세지 없이 echo.NewHTTPError()를 사용할 수있다. 그러한 경우에는 status text가 에러 메세지로써 사용된다. 예를 들면 “Unauthorized”
+
+ 
+
+Default HTTP Error Handler
+Echo는 JSON 포맷안에 에러를 담아 보내는 디폴트 HTTP에러 핸들러를 제공한다. 
+
+표준의 error 경우 응답은 다음과 같이 전송됩니다 500 - Internal Server Error. 그러나 디버그 모드에서 실행중인 경우 원래 오류 메시지가 전송됩니다. error가 *HTTPError인 경우 제공된 상태 코드 및 메시지와 함께 응답이 전송됩니다. 로깅이 켜져 있으면 오류 메시지도 기록됩니다.
+
+ 
+
+{
+  "message": "error connecting to redis"
+}
+ 
+
+Custom HTTP Error Handler
+사용자 맞춤 HTTP error handler는 e.HTTPErrorHandler를 통해서 세팅이 가능하다
+
+대부분의 경우 기본 오류 HTTP 처리기로 충분하다. 그러나 다른 유형의 오류를 캡처하고 그에 따라 조치 이메일 알림 또는 로그 오류를 중앙 집중식 시스템으로 보내려는 경우 사용자 지정 HTTP 오류 처리기가 유용 할 수 있다. 오류 페이지 또는 JSON 응답과 같은 사용자 정의 된 응답을 클라이언트에 보낼 수 있다.
+
+ 
+
+Error Pages
+다음 사용자 정의 HTTP 오류 처리기는 다양한 유형의 오류에 대한 오류 페이지를 표시하고 오류를 기록하는 방법을 보여준다. 오류 페이지의 이름은 <CODE>.html 형태여야 한다.
+
+ 
+
+func customHTTPErrorHandler(err error, c echo.Context) {
+	code := http.StatusInternalServerError
+	if he, ok := err.(*echo.HTTPError); ok {
+		code = he.Code
+	}
+	errorPage := fmt.Sprintf("%d.html", code)
+	if err := c.File(errorPage); err != nil {
+		c.Logger().Error(err)
+	}
+	c.Logger().Error(err)
+}
+
+e.HTTPErrorHandler = customHTTPErrorHandler
+ 
+
+>> Logger에 로그를 작성하는 것 대신에, 엘라스틱 서치나 Splunk와 같은 외부 서비스에 작성 할 수 있다.
+
+ 
+
+Migration (변경사항)
+1. Let’s Encrypt를 사용한 자동화 된 TLS 인증서
+
+2. graceful shutdown을 위한 내장 지원
+
+3. 표준 핸들러와 미들웨어를 감쌀수 있는 유틸 기능
+
+4. Map type as shorthand for map[string]interface{}
+
+5. Context는 현재 표준 net/http 요청과 응답을 감싼다.
+
+6. 향상된 리다이렉션과 CORS 미들웨어 / static 미들웨어 삭제
+
+ 
+
+새로운 구성
+
+ 
+
+새로운 API
+
+ 
+
+setter / getter 기능 대신 다음 속성을 추가
+
+ 
+
+Request
+Bind Data
+요청 본문을 Go type으로 바인딩 하려면 다음을 사용해야한다. Context#Bind(i interface{})
+
+디폴트 바인더는 Content-Type 해더를 기반으로 application/json, application/xml 및 application/x-www-form-urlencoded 데이터의 디코딩을 지원한다
+
+아래 예제는 요청 페이로드를 User 구조체에 바인딩 한다.
+
+ 
+
+Bind Data Example
+// User
+type User struct {
+  Name  string `json:"name" form:"name" query:"name"`
+  Email string `json:"email" form:"email" query:"email"`
+}
+
+// Handler
+func(c echo.Context) (err error) {
+  u := new(User)
+  if err = c.Bind(u); err != nil {
+    return
+  }
+  return c.JSON(http.StatusOK, u)
+}
+ 
+
+JSON 데이터
+curl \
+  -X POST \
+  http://localhost:1323/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Joe","email":"joe@labstack"}'
+ 
+
+FORM 데이터
+curl \
+  -X POST \
+  http://localhost:1323/users \
+  -d 'name=Joe' \
+  -d 'email=joe@labstack.com'
+ 
+
+Query Parameters
+curl \
+  -X GET \
+  http://localhost:1323/users\?name\=Joe\&email\=joe@labstack.com
+ 
+
+Custom Binder
+개인 맞춤화 된 바인더는 Echo#Binder 를 사용하여 등록 할 수 있다.
+
+ 
+
+Custom Binder Example 
+type CustomBinder struct {}
+
+func (cb *CustomBinder) Bind(i interface{}, c echo.Context) (err error) {
+	// You may use default binder
+	db := new(echo.DefaultBinder)
+	if err = db.Bind(i, c); err != echo.ErrUnsupportedMediaType {
+		return
+	}
+
+	// Define your custom implementation
+
+	return
+}
+ 
+
+Retrieve Data
+Form Data
+Context#FormValue(name string) 를 사용하여 이름으로 Form 데이터를 추출할 수 있다.
+
+ 
+
+Form Data Example
+// Handler
+func(c echo.Context) error {
+	name := c.FormValue("name")
+	return c.String(http.StatusOK, name)
+}
+
+curl \
+  -X POST \
+  http://localhost:1323 \
+  -d 'name=Joe'
+ 
+
+>> custom 데이터 타입으로 바인딩 하기 위해서 Echo#BindUnmarshaler 인터페이스를 실행 할 수 있다
+
+ 
+
+Example
+type Timestamp time.Time
+
+func (t *Timestamp) UnmarshalParam(src string) error {
+	ts, err := time.Parse(time.RFC3339, src)
+	*t = Timestamp(ts)
+	return err
+}
+ 
+
+Query Parameters
+쿼리 파라미터는 Context#QueryParam(name string) 를 사용하여 이름으로 찾을 수 있다
+
+ 
+
+Query Parameters Example
+// Handler
+func(c echo.Context) error {
+	name := c.QueryParam("name")
+	return c.String(http.StatusOK, name)
+})
+curl \
+  -X GET \
+  http://localhost:1323\?name\=Joe
+ 
+
+>> form data와 유사하며, 위와 같이 Context#QueryParam(name string)를 사용하여 custom data 타입으로 바인딩 할 수 있다. 
+
+ 
+
+Path Parameters
+Context#Param(name string) string를 사용하여 등록 된 Path parameters를 찾을 수 있다.
+
+ 
+
+Path Parameters Example
+e.GET("/users/:name", func(c echo.Context) error {
+	name := c.Param("name")
+	return c.String(http.StatusOK, name)
+})
+$ curl http://localhost:1323/users/Joe
+ 
+
+Validate Data
+Echo에는 내장 된 데이터 유효성 검사 기능이 없지만, 타사 라이브러리와 Echo#Validator를 사용하여 사용자 지정 유효성 검사기를 등록 할 수 있습니다 .
+
+아래 예는 https://github.com/go-playground/validator 프레임 워크를 유효성 검사에 사용 합니다.
+
+ 
+
+Validate Data Example
+type (
+	User struct {
+		Name  string `json:"name" validate:"required"`
+		Email string `json:"email" validate:"required,email"`
+	}
+
+	CustomValidator struct {
+		validator *validator.Validate
+	}
+)
+
+func (cv *CustomValidator) Validate(i interface{}) error {
+	return cv.validator.Struct(i)
+}
+
+func main() {
+	e := echo.New()
+	e.Validator = &CustomValidator{validator: validator.New()}
+	e.POST("/users", func(c echo.Context) (err error) {
+		u := new(User)
+		if err = c.Bind(u); err != nil {
+			return
+		}
+		if err = c.Validate(u); err != nil {
+			return
+		}
+		return c.JSON(http.StatusOK, u)
+	})
+	e.Logger.Fatal(e.Start(":1323"))
+}
